@@ -72,31 +72,6 @@ Each joint uses a **two-stage reduction**:
 
 ---
 
-## Timeline
-
-### Semester 1 — Full Physical Robot + Remote Control
-
-Build the complete working robot arm with master-slave teleoperation:
-
-- Design and 3D print mechanical parts (cycloidal gearboxes, GT2 pulleys, fin-ray gripper)
-- Use 2020 aluminum extrusions for the main structural arm links
-- Complete electrical wiring and full mechanical assembly
-- Write firmware: motor driving, encoder feedback, ADRC control loops
-- ESP-NOW communication between Master (ESP32-S3) and Nodes (ESP32-C6)
-- Build master-slave teleoperation controller (unactuated replica arm with AS5600 encoders + ESP32)
-- **Deliverable:** Fully running 3-DOF arm controlled via master-slave remote
-
-### Semester 2 — Vision, Voice & Advanced Features
-
-Add intelligent input modalities and polish:
-
-- Vision pipeline (overhead camera, OpenCV object detection, pick-and-place)
-- Voice command integration (NLP intent parsing → coordinate dispatch)
-- Full multimodal state machine (Idle, Vision Sort, Voice Sort, Teleop, Teach, Repeat)
-- End-to-end system testing and demonstration
-
----
-
 ## Repository Structure
 
 ```
