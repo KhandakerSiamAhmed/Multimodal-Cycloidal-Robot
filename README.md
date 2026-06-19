@@ -83,8 +83,10 @@ Multimodal-Cycloidal-Robot/
 ├── .gitignore
 ├── .gitattributes
 └── Documentation/
-    └── BOM.csv               ← Bill of materials
+    ├── BOM.csv               ← Bill of materials
+    └── Project_Overview.md   ← Project overview and objectives
 ```
+
 
 Code (firmware & software) will be added as it is written.
 
