@@ -1,0 +1,2299 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SCADA HMI - J1 — Joint 1 Telemetry</title>
+  <meta name="description"
+    content="Real-time 3D digital twin of NEMA 17 stepper motor with live AS5600 encoder telemetry from ESP32-C6. Supports offline Serial and online Wi-Fi modes." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+
+
+  <style>
+    :root {
+      --bg-deep: #111111;
+      --bg-card: #111111;
+      --bg-panel: #181818;
+      --border: #333333;
+      --border-glow: #444444;
+      --accent: #16A34A;
+      --accent-dim: rgba(22, 163, 74, 0.15);
+      --accent2: #16A34A;
+      --green: #16A34A;
+      --red: #DC2626;
+      --amber: #FACC15;
+      --orange: #FACC15;
+      --text-hi: #FFFFFF;
+      --text-mid: #A3A3A3;
+      --text-lo: #737373;
+      --font-mono: 'IBM Plex Mono', 'Consolas', 'Fira Code', monospace;
+      --font-ui: 'Helvetica Neue', Arial, sans-serif;
+      --radius: 0px;
+      --radius-sm: 2px;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg-deep);
+      color: var(--text-hi);
+      font-family: var(--font-ui);
+    }
+
+    #app {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      grid-template-rows: 64px 1fr;
+      height: 100vh;
+    }
+
+    /* ── Header ──────────────────────────────────────────────── */
+    #header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      z-index: 10;
+      gap: 12px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+
+    .logo-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 0px;
+      background: var(--accent);
+
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+
+      0%,
+      100% {}
+
+      50% {}
+    }
+
+    .header-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .header-sub {
+      font-size: 12px;
+      color: var(--text-mid);
+      margin-left: 6px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: nowrap;
+    }
+
+    /* ── Mode Tabs ───────────────────────────────────────────── */
+        /* ── Motor Mode Tabs ──────────────────────────────────────────── */
+    .motor-mode-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+
+    .motor-mode-btn {
+      flex: 1; padding: 8px 6px;
+      border-radius: var(--radius-sm);
+      font-size: 11px; font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-panel);
+      color: var(--text-mid);
+      font-family: var(--font-ui);
+      transition: all 0.2s; text-align: center;
+    }
+
+    .motor-mode-btn:hover { color: var(--text-hi); border-color: var(--border-glow); }
+
+    .motor-mode-btn.active-continuous {
+      background: rgba(246,173,85,0.15);
+      color: var(--amber);
+      border-color: rgba(246,173,85,0.45);
+    }
+
+    .motor-mode-btn.active-pid {
+      background: rgba(99,179,237,0.15);
+      color: #63b3ed;
+      border-color: rgba(99,179,237,0.45);
+    }
+
+    /* ── PID Section ─────────────────────────────────────────────────── */
+    .pid-section { display: none; }
+    .pid-section.visible { display: block; }
+    .pid-slider-row { margin-bottom: 12px; }
+
+    .pid-slider-label {
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: var(--text-mid); margin-bottom: 6px;
+    }
+
+    .pid-key { font-family: var(--font-mono); font-weight: 700; color: #63b3ed; }
+    .pid-value { font-family: var(--font-mono); color: var(--text-hi); min-width: 42px; text-align: right; }
+
+    .pid-slider {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 4px; border-radius: 2px;
+      background: var(--bg-panel); border: 1px solid var(--border);
+      outline: none; cursor: pointer;
+    }
+
+    .pid-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 14px; height: 14px;
+      background: #63b3ed; cursor: pointer;
+      border: 2px solid rgba(99,179,237,0.5);
+    }
+
+    .pid-slider::-moz-range-thumb {
+      width: 14px; height: 14px;
+      background: #63b3ed; cursor: pointer;
+      border: 2px solid rgba(99,179,237,0.5);
+    }
+
+    .pid-range-labels {
+      display: flex; justify-content: space-between;
+      font-size: 9px; color: var(--text-lo); margin-top: 3px;
+    }
+
+    .target-row { display: flex; gap: 8px; align-items: stretch; margin-bottom: 10px; }
+    .target-input-wrap { flex: 1; position: relative; }
+
+    #target-angle-input {
+      width: 100%; background: var(--bg-deep);
+      border: 1px solid var(--border);
+      color: var(--text-hi); font-family: var(--font-mono);
+      font-size: 16px; font-weight: 700;
+      padding: 8px 26px 8px 10px;
+      border-radius: var(--radius-sm);
+      outline: none; transition: border-color 0.2s; text-align: center;
+    }
+
+    #target-angle-input:focus { border-color: #63b3ed; }
+
+    .target-deg {
+      position: absolute; right: 8px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 11px; color: var(--text-lo); pointer-events: none;
+    }
+
+    .pid-error-strip {
+      display: flex; justify-content: space-between;
+      padding: 6px 10px;
+      background: rgba(99,179,237,0.07);
+      border: 1px solid rgba(99,179,237,0.2);
+      border-radius: var(--radius-sm);
+      font-size: 11px; margin-bottom: 12px;
+    }
+
+    .pid-error-strip .e-label { color: var(--text-mid); }
+    .pid-error-strip .e-val { font-family: var(--font-mono); font-weight: 600; color: #63b3ed; }
+
+    .btn-blue { background: rgba(99,179,237,0.12); color: #63b3ed; border-color: rgba(99,179,237,0.35); }
+    .btn-blue:hover { background: rgba(99,179,237,0.22); }
+
+    /* Serial controls */
+    #serial-port-label {
+      font-size: 11px;
+      color: var(--text-mid);
+      font-family: var(--font-mono);
+      max-width: 130px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Shared button styles */
+    .hdr-btn {
+      border: 1px solid var(--border-glow);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: var(--font-ui);
+      white-space: nowrap;
+    }
+
+    .hdr-btn-serial {
+      background: rgba(246, 173, 85, 0.12);
+      color: var(--amber);
+      border-color: rgba(246, 173, 85, 0.35);
+    }
+
+    .hdr-btn-serial:hover {
+      background: rgba(246, 173, 85, 0.22);
+    }
+
+    .hdr-btn-danger {
+      background: rgba(252, 129, 129, 0.08);
+      color: var(--red);
+      border-color: rgba(252, 129, 129, 0.3);
+    }
+
+    .hdr-btn-danger:hover {
+      background: rgba(252, 129, 129, 0.18);
+    }
+
+    /* Connection pill */
+    #conn-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 12px;
+      border-radius: 0px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+    }
+
+    #conn-pill .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 0px;
+      flex-shrink: 0;
+    }
+
+    #conn-pill.connected {
+      border-color: rgba(72, 187, 120, 0.4);
+      background: rgba(72, 187, 120, 0.08);
+      color: var(--green);
+    }
+
+    #conn-pill.connected .dot {
+      background: var(--green);
+    }
+
+    #conn-pill.disconnected {
+      border-color: rgba(252, 129, 129, 0.4);
+      background: rgba(252, 129, 129, 0.08);
+      color: var(--red);
+    }
+
+    #conn-pill.disconnected .dot {
+      background: var(--red);
+    }
+
+    #conn-pill.connecting {
+      border-color: rgba(246, 173, 85, 0.4);
+      background: rgba(246, 173, 85, 0.08);
+      color: var(--amber);
+    }
+
+    #conn-pill.connecting .dot {
+      background: var(--amber);
+      animation: pulse-dot 1s ease infinite;
+    }
+
+    /* ── Mode Badge in viewport ──────────────────────────────── */
+    #mode-badge {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(13, 17, 23, 0.80);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      z-index: 5;
+      transition: all 0.3s;
+    }
+
+
+
+    /* ── 3D Viewport ─────────────────────────────────────────── */
+    .pane-viewport {
+      position: relative;
+      background: var(--bg-panel);
+      overflow: hidden;
+    }
+
+    #three-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .vp-badge {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: rgba(13, 17, 23, 0.75);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 14px;
+      font-size: 11px;
+      color: var(--text-mid);
+    }
+
+    #angle-big {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      pointer-events: none;
+    }
+
+    #angle-big .val {
+      font-family: var(--font-mono);
+      font-size: 64px;
+      font-weight: 700;
+      letter-spacing: -2px;
+      font-variant-numeric: tabular-nums;
+      background: var(--bg-panel);
+
+
+      line-height: 1;
+    }
+
+    #angle-big .unit {
+      font-size: 20px;
+      color: var(--text-mid);
+      font-weight: 300;
+    }
+
+    #angle-big .label {
+      font-size: 11px;
+      color: var(--text-lo);
+      margin-top: 4px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    /* Loader */
+    #loader {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-deep);
+      z-index: 20;
+      transition: opacity 0.6s ease;
+    }
+
+    #loader.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loader-ring {
+      width: 60px;
+      height: 60px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 0px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    #loader-msg {
+      font-size: 13px;
+      color: var(--text-mid);
+    }
+
+    #loader-detail {
+      font-size: 11px;
+      color: var(--text-lo);
+      margin-top: 6px;
+      font-family: var(--font-mono);
+    }
+
+    /* Grid overlay removed */
+
+    /* ── Serial-not-supported banner ─────────────────────────── */
+    #serial-warn {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 15;
+      background: rgba(252, 129, 129, 0.10);
+      border-top: 1px solid rgba(252, 129, 129, 0.25);
+      color: var(--red);
+      font-size: 11px;
+      padding: 8px 20px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #serial-warn.visible {
+      display: flex;
+    }
+
+    /* ── Right Panel ─────────────────────────────────────────── */
+    .pane-controls {
+      background: var(--bg-card);
+      border-left: 1px solid var(--border);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .pane-controls::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .pane-controls::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 0px;
+    }
+
+    .telemetry-grid {
+      padding: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-title {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-lo);
+      margin-bottom: 14px;
+    }
+
+    /* Gauge */
+    .gauge-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 4px;
+    }
+
+    .gauge-track {
+      fill: none;
+      stroke: var(--bg-panel);
+      stroke-width: 8;
+    }
+
+    .gauge-fill {
+      fill: none;
+      stroke-width: 8;
+      stroke: var(--accent);
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.08s linear;
+
+    }
+
+    .gauge-needle {
+      transform-origin: 90px 90px;
+      transition: transform 0.08s linear;
+    }
+
+    .gauge-center-text {
+      text-anchor: middle;
+      font-family: var(--font-mono);
+    }
+
+    /* Stats */
+    .stat-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      background: var(--bg-panel);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+
+    .stat-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-mid);
+    }
+
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-hi);
+    }
+
+    .stat-value.ok {
+      color: var(--green);
+    }
+
+    .stat-value.warn {
+      color: var(--amber);
+    }
+
+    .stat-value.err {
+      color: var(--red);
+    }
+
+    .stat-value.accent {
+      color: var(--accent);
+    }
+
+    /* Source indicator row */
+    #source-row .stat-value {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #source-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 0px;
+      background: var(--text-lo);
+      flex-shrink: 0;
+    }
+
+    #source-dot.serial {
+      background: var(--amber);
+    }
+
+    #source-dot.online {
+      background: var(--green);
+    }
+
+    /* AGC Bar */
+    .agc-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-mid);
+      margin-bottom: 6px;
+    }
+
+    .agc-bar-bg {
+      height: 8px;
+      background: var(--bg-panel);
+      border-radius: 0px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .agc-bar-fill {
+      height: 100%;
+      border-radius: 0px;
+      background: var(--bg-panel);
+      transition: width 0.3s ease;
+    }
+
+    /* Sparkline */
+    #sparkline-svg {
+      width: 100%;
+      height: 60px;
+      overflow: visible;
+    }
+
+    .spark-path {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 1.5;
+      stroke-linejoin: round;
+    }
+
+    .spark-fill {
+      fill: var(--accent-dim);
+      stroke: none;
+    }
+
+    .spark-axis {
+      stroke: var(--border);
+      stroke-width: 1;
+    }
+
+    /* Buttons */
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 9px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+      font-family: var(--font-ui);
+    }
+
+    .btn-primary {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-color: var(--border-glow);
+    }
+
+    .btn-primary:hover {
+      background: rgba(99, 179, 237, 0.25);
+      transform: translateY(-1px);
+    }
+
+    .btn-danger {
+      background: rgba(252, 129, 129, 0.08);
+      color: var(--red);
+      border-color: rgba(252, 129, 129, 0.3);
+    }
+
+    .btn-danger:hover {
+      background: rgba(252, 129, 129, 0.15);
+    }
+
+    .btn-neutral {
+      background: var(--bg-panel);
+      color: var(--text-mid);
+    }
+
+    .btn-neutral:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-hi);
+    }
+
+    /* Model Banner */
+    #model-banner {
+      padding: 12px 18px;
+      background: rgba(246, 173, 85, 0.06);
+      border-bottom: 1px solid rgba(246, 173, 85, 0.2);
+      font-size: 11px;
+      color: var(--amber);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #model-banner.hidden {
+      display: none;
+    }
+
+    .hz-badge {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-lo);
+      padding: 2px 6px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 0px;
+    }
+
+    .btn-amber {
+      background: rgba(246, 173, 85, 0.12);
+      color: var(--amber);
+      border-color: rgba(246, 173, 85, 0.35);
+    }
+
+    .btn-amber:hover {
+      background: rgba(246, 173, 85, 0.22);
+    }
+
+    .btn-amber.active {
+      background: rgba(246, 173, 85, 0.28);
+      border-color: var(--amber);
+    }
+
+    /* Zero status strip */
+    #zero-status {
+      margin-top: 8px;
+      padding: 7px 10px;
+      background: rgba(246, 173, 85, 0.08);
+      border: 1px solid rgba(246, 173, 85, 0.25);
+      border-radius: var(--radius-sm);
+      font-size: 10px;
+      color: var(--amber);
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    #zero-status.visible {
+      display: flex;
+    }
+
+    .zero-tag {
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 1px 6px;
+      border-radius: 0px;
+      background: rgba(246, 173, 85, 0.2);
+      font-size: 9px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="app">
+
+    <header id="header">
+      <div class="header-left">
+        <div class="logo-dot"></div>
+        <div>
+          <span class="header-title">Digital Twin Interface</span>
+          <span class="header-sub">Joint 1 Telemetry</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+
+
+        <span id="serial-port-label">No port selected</span>
+        <button id="btn-serial-connect" class="hdr-btn hdr-btn-serial" onclick="serialConnect()">🔌 Connect Serial</button>
+        <button id="btn-serial-disconnect" class="hdr-btn hdr-btn-danger" onclick="serialDisconnect()"
+          style="display:none;">⏏ Disconnect</button>
+
+        <div id="conn-pill" class="disconnected">
+          <div class="dot"></div>
+          <span id="conn-label">Disconnected</span>
+        </div>
+
+      </div>
+    </header>
+
+    <div id="viewport" class="pane-viewport">
+      <canvas id="three-canvas"></canvas>
+      <div id="loader">
+        <div class="loader-ring"></div>
+        <div id="loader-msg">Loading 3D Model…</div>
+        <div id="loader-detail">nema17.glb</div>
+      </div>
+
+      <div class="vp-badge">Joint 1 · <span>NEMA 17 Stepper</span></div>
+
+
+      <div id="mode-badge">🔌 Serial · USB</div>
+
+      <div id="angle-big">
+        <div class="val" id="angle-display">---</div>
+        <div class="unit" id="angle-unit">degrees</div>
+        <div class="label" id="angle-label">Base Azimuth Angle</div>
+        <div style="margin-top: 10px; font-size: 28px; font-weight: bold; color: var(--amber); text-shadow: 0 0 15px rgba(246,173,85,0.4);">
+          <span id="speed-display">---</span>
+          <span style="font-size: 14px; font-weight: normal; color: var(--text-mid);">RPM</span>
+        </div>
+      </div>
+
+
+      <div id="serial-warn">
+        ⚠️ Web Serial API not available in this browser or context.
+        Use <strong style="margin:0 4px;">serve.bat</strong> to open via localhost, then use Chrome or Edge.
+      </div>
+    </div>
+
+    <aside id="panel" class="pane-controls">
+
+      <div id="model-banner">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        Drop <strong style="margin:0 4px">nema17.glb</strong> in this folder &amp; reload. Set shaft mesh name below.
+      </div>
+
+
+      <div class="telemetry-grid">
+        <div class="section-title">Kinematics (J1)</div>
+        <div class="gauge-wrap">
+          <svg width="180" height="180" viewBox="0 0 180 180" overflow="visible">
+            <defs>
+              <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#9f7aea" />
+                <stop offset="100%" stop-color="#63b3ed" />
+              </linearGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <circle class="gauge-track" cx="90" cy="90" r="70"
+              style="stroke-dasharray:440;transform:rotate(-90deg);transform-origin:90px 90px;" />
+            <circle id="gauge-fill" class="gauge-fill" cx="90" cy="90" r="70"
+              style="stroke-dasharray:440;stroke-dashoffset:440;transform:rotate(-90deg);transform-origin:90px 90px;" />
+            <g id="gauge-needle" class="gauge-needle">
+              <line x1="90" y1="90" x2="90" y2="28" stroke="#63b3ed" stroke-width="2" stroke-linecap="round"
+                filter="url(#glow)" />
+              <circle cx="90" cy="90" r="5" fill="#63b3ed" filter="url(#glow)" />
+            </g>
+            <text x="90" y="86" class="gauge-center-text" fill="#f0f6fc" font-size="22" font-weight="700"
+              id="gauge-val">---</text>
+            <text x="90" y="103" class="gauge-center-text" fill="#8b949e" font-size="10">degrees</text>
+          </svg>
+        </div>
+      </div>
+      <div class="telemetry-grid">
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>Velocity vs Time (RPM)</span>
+          <span id="vel-scale-label" style="font-size:10px;font-family:var(--font-mono);color:var(--amber);">±<span id="vel-scale-val">300</span> RPM</span>
+        </div>
+        <canvas id="vel-canvas" style="width:100%;height:90px;display:block;margin-top:8px;border:1px solid var(--border);"></canvas>
+        <div style="display:flex;gap:6px;margin-top:6px;">
+          <button id="vel-zoom-in"  class="btn btn-neutral" style="flex:1;padding:5px;font-size:11px;" onclick="velZoomIn()">＋ Zoom In</button>
+          <button id="vel-zoom-out" class="btn btn-neutral" style="flex:1;padding:5px;font-size:11px;" onclick="velZoomOut()">－ Zoom Out</button>
+          <button id="vel-zoom-rst" class="btn btn-amber"  style="flex:1;padding:5px;font-size:11px;" onclick="velZoomReset()">⟳ Reset</button>
+        </div>
+      </div>
+
+
+
+      <div class="telemetry-grid">
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          Telemetry Data <span class="hz-badge" id="hz-badge">-- Hz</span>
+        </div>
+        <div class="stat-row" id="source-row">
+          <span class="stat-label">Data Source</span>
+          <span class="stat-value">
+            <span id="source-dot"></span>
+            <span id="source-label">—</span>
+          </span>
+        </div>
+        <div class="stat-row"><span class="stat-label">Base Azimuth Angle</span><span class="stat-value accent"
+            id="st-angle">---°</span></div>
+        <div class="stat-row"><span class="stat-label">Measured Speed</span><span class="stat-value"
+            id="st-speed">--- RPM</span></div>
+        <div class="stat-row"><span class="stat-label">Cumulative Angle</span><span class="stat-value"
+            id="st-cumulative">---°</span></div>
+        <div class="stat-row"><span class="stat-label">Raw 12-bit Ticks</span><span class="stat-value" id="st-raw">--- /
+            4096</span></div>
+      </div>
+
+
+      <div class="telemetry-grid">
+        <div class="section-title">Encoder Diagnostics</div>
+        <div class="stat-row"><span class="stat-label">Status</span><span class="stat-value"
+            id="st-magnet-status">---</span></div>
+        <div class="stat-row"><span class="stat-label">Magnet Detected</span><span class="stat-value"
+            id="st-magnet-detected">---</span></div>
+        <div class="stat-row"><span class="stat-label">Signal Strength</span><span class="stat-value"
+            id="st-magnet-signal">---</span></div>
+        <div style="margin-top:12px;">
+          <div class="agc-label-row"><span>AGC (Gain Control)</span><span id="agc-val">---</span></div>
+          <div class="agc-bar-bg">
+            <div class="agc-bar-fill" id="agc-bar" style="width:0%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:9px;color:var(--text-lo);">
+            <span>0 (Strong)</span><span>128 (Optimal)</span><span>255 (Weak)</span>
+          </div>
+        </div>
+      </div>
+
+
+
+
+
+      <!-- ── Motor Mode & PID Control ─────────────────────────── -->
+      <div class="telemetry-grid">
+        <div class="section-title">Motor Mode</div>
+
+        <div class="motor-mode-tabs">
+          <button id="btn-mode-continuous" class="motor-mode-btn active-continuous"
+            onclick="setMotorMode('continuous')">↻ Continuous</button>
+          <button id="btn-mode-pid" class="motor-mode-btn"
+            onclick="setMotorMode('pid')">◎ PID Target</button>
+        </div>
+
+        <div id="continuous-section" class="pid-section visible">
+          <div style="font-size:10px;color:var(--text-lo);margin-bottom:12px;">
+            Set constant rotation speed or stop the motor.
+          </div>
+          <div class="btn-row" style="margin-bottom:8px;">
+            <button class="btn btn-neutral" onclick="sendContinuousSpeed(200)">↻ CW (200 RPM)</button>
+            <button class="btn btn-neutral" onclick="sendContinuousSpeed(-200)">↺ CCW (-200 RPM)</button>
+          </div>
+          <button class="btn btn-danger" style="width:100%;margin-bottom:8px;font-weight:bold;" onclick="sendContinuousSpeed(0)">
+            ■ STOP
+          </button>
+          <div style="font-size:10px;color:var(--text-lo);margin-top:4px;text-align:center;">
+            Use Alt+Drag on 3D view to jog interactively.
+          </div>
+        </div>
+
+        <div id="pid-section" class="pid-section">
+          <div style="font-size:10px;color:var(--text-lo);margin-bottom:12px;">
+            Set target angle and tune gains. Commands sent via Serial JSON.
+          </div>
+
+          <div class="stat-row" style="flex-direction:column;align-items:flex-start;gap:8px;margin-bottom:8px;">
+            <span class="stat-label">Target Angle</span>
+            <div class="target-row" style="width:100%;margin-bottom:0;">
+              <div class="target-input-wrap">
+                <input type="number" id="target-angle-input" min="-3600" max="3600" step="1" value="0" />
+                <span class="target-deg">°</span>
+              </div>
+              <button class="btn btn-blue" style="flex:none;padding:7px 16px;font-size:12px;"
+                onclick="sendTargetAngle()">Send</button>
+            </div>
+          </div>
+
+          <div class="pid-error-strip">
+            <span class="e-label">Error (target − actual)</span>
+            <span class="e-val" id="pid-error-val">---°</span>
+          </div>
+
+          <div class="section-title" style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+            <span>Target vs Current Angle</span>
+            <span id="pid-scale-label" style="font-size:10px;font-family:var(--font-mono);color:#63b3ed;">±<span id="pid-scale-val">360</span>°</span>
+          </div>
+          <canvas id="pid-canvas" style="width:100%;height:90px;display:block;margin-top:8px;margin-bottom:12px;border:1px solid var(--border);"></canvas>
+
+          <div class="section-title" style="margin-bottom:10px;">PID Gains</div>
+
+          <div class="pid-slider-row">
+            <div class="pid-slider-label">
+              <span class="pid-key">Kp</span>
+              <span class="pid-value" id="kp-val">1.0</span>
+            </div>
+            <input type="range" id="kp-slider" class="pid-slider"
+              min="0" max="10" step="0.1" value="1.0" oninput="updatePIDDisplay()" />
+            <div class="pid-range-labels"><span>0</span><span>10</span></div>
+          </div>
+
+          <div class="pid-slider-row">
+            <div class="pid-slider-label">
+              <span class="pid-key">Ki</span>
+              <span class="pid-value" id="ki-val">0.10</span>
+            </div>
+            <input type="range" id="ki-slider" class="pid-slider"
+              min="0" max="5" step="0.01" value="0.1" oninput="updatePIDDisplay()" />
+            <div class="pid-range-labels"><span>0</span><span>5</span></div>
+          </div>
+
+          <div class="pid-slider-row">
+            <div class="pid-slider-label">
+              <span class="pid-key">Kd</span>
+              <span class="pid-value" id="kd-val">0.05</span>
+            </div>
+            <input type="range" id="kd-slider" class="pid-slider"
+              min="0" max="2" step="0.01" value="0.05" oninput="updatePIDDisplay()" />
+            <div class="pid-range-labels"><span>0</span><span>2</span></div>
+          </div>
+
+          <button class="btn btn-blue" style="width:100%;margin-top:4px;" onclick="sendPIDGains()">
+            📡 Send PID Gains
+          </button>
+        </div>
+      </div>
+
+      <div class="telemetry-grid">
+        <div class="section-title">Digital Twin Settings</div>
+
+
+        <div class="stat-row" style="flex-direction:column;align-items:flex-start;gap:6px;">
+          <span class="stat-label">Shaft Mesh Indices (comma-separated)</span>
+          <input id="shaft-indices" type="text" value="4" style="width:100%;background:var(--bg-deep);border:1px solid var(--border);color:var(--text-hi);
+                 font-family:var(--font-mono);font-size:12px;padding:6px 10px;border-radius: 0px;outline:none;"
+            oninput="updateShaftIndices(this.value)" />
+          <span style="font-size:10px;color:var(--text-lo);" id="shaft-hint">
+            Use Mesh Inspector below to identify which index is the shaft.
+          </span>
+        </div>
+
+
+        <div class="stat-row" style="justify-content:space-between;margin-top:8px;">
+          <span class="stat-label">Rotation Direction</span>
+          <button id="btn-invert" class="btn btn-primary" style="flex:none;padding:5px 12px;font-size:11px;"
+            onclick="toggleInvert()">
+            ↺ Inverted
+          </button>
+        </div>
+
+
+        <div class="stat-row" style="flex-direction:column;align-items:flex-start;gap:6px;margin-top:8px;">
+          <span class="stat-label">Rotation Axis</span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-primary" id="axis-y" onclick="setAxis('Y')">Y (default)</button>
+            <button class="btn btn-neutral" id="axis-z" onclick="setAxis('Z')">Z</button>
+            <button class="btn btn-neutral" id="axis-x" onclick="setAxis('X')">X</button>
+          </div>
+        </div>
+
+
+        <div style="margin-top:12px;">
+          <div class="section-title" style="margin-bottom:8px;">Mesh Inspector</div>
+          <div style="font-size:10px;color:var(--text-lo);margin-bottom:8px;line-height:1.5;">
+            Click a mesh button to flash-highlight it in the viewport.
+            Shaft meshes glow <span style="color:#f6ad55;">amber</span>.
+            Click again to clear.
+          </div>
+          <div id="mesh-inspector-btns" style="display:flex;flex-wrap:wrap;gap:5px;">
+            <span style="font-size:10px;color:var(--text-lo);">Load the GLB to see meshes…</span>
+          </div>
+        </div>
+      </div>
+
+
+
+      <div class="telemetry-grid">
+        <div class="section-title">Jog Panel</div>
+
+
+        <div class="btn-row" style="margin-bottom:6px;">
+          <button class="btn btn-amber" id="btn-sw-zero" onclick="setSoftZero()">
+            ◎ Zero Here
+          </button>
+          <button class="btn btn-neutral" id="btn-clear-zero" onclick="clearSoftZero()" style="display:none;">
+            × Clear Zero
+          </button>
+        </div>
+
+        <div id="zero-status">
+          <span class="zero-tag">RELATIVE</span>
+          <span>offset: <span id="zero-offset-val" style="font-family:var(--font-mono);">---°</span></span>
+
+        </div>
+
+        <div class="btn-row" style="margin-bottom:8px;margin-top:8px;">
+          <button class="btn btn-primary" onclick="zeroPosition()">&#{8857}; HW Zero</button>
+          <button class="btn btn-neutral" onclick="toggleAutoRotate()">&#x21BB; Auto-Rotate Cam</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-neutral" onclick="resetCamera()">&#8982; Reset Camera</button>
+          <button class="btn btn-neutral" onclick="toggleWireframe()">&#x2B21; Wireframe</button>
+        </div>
+        <div style="font-size:10px;color:var(--text-lo);margin-top:12px;text-align:center;">
+          Hold <kbd style="background:#333;color:#fff;padding:2px 4px;border-radius:3px;">Alt</kbd> + Drag on 3D view to rotate rotor manually.
+        </div>
+      </div>
+
+
+      <div class="telemetry-grid" style="border-bottom:none;">
+        <div style="font-size:10px;color:var(--text-lo);line-height:1.8;">
+          <div>System Live</div>
+          <div style="margin-top:8px;">Last update: <span id="last-update">---</span></div>
+        </div>
+      </div>
+
+    </aside>
+  </div>
+
+  <script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.167.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.167.1/examples/jsm/"
+  }
+}
+</script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ══════════════════════════════════════════════════════════════════
+    //  CONFIG
+    // ══════════════════════════════════════════════════════════════════
+    const CONFIG = {
+      modelPath: 'nema17.glb',
+      shaftMeshIndices: [4],
+      rotationAxis: 'Y',
+      rotationInverted: true,  // negate angle so CW real = CW digital twin
+      historyLength: 200, // 10 seconds of history at 20Hz
+    };
+
+    // ══════════════════════════════════════════════════════════════════
+    //  GLOBAL STATE
+    // ══════════════════════════════════════════════════════════════════
+    let scene, camera, renderer, controls;
+    let motorBody = null;
+    let shaftMeshArray = [];
+    let shaftPivot = null;
+    let wireframeMode = false;
+    let currentAngleDeg = 0;
+    let targetAngleDeg = 0;
+    const speedHistory = [];
+    let updateCount = 0;
+    let lastFpsTime = performance.now();
+    let allMeshesGlobal = [];   // flat ordered mesh list — populated after GLB load
+    let hasData = false;        // true once first telemetry frame arrives
+    let motorMode = 'continuous'; // 'continuous' | 'pid'
+
+    // ── Velocity Graph — Manual Zoom ────────────────────────────────────
+    let velYMax = 300;  // ± RPM shown (user controlled, never auto-changes)
+    const VEL_ZOOM_STEP = 50; // RPM per zoom step
+    const VEL_Y_MIN = 25;     // minimum scale (most zoomed-in)
+    const VEL_Y_MAX = 1000;   // maximum scale (most zoomed-out)
+
+    function velZoomIn()    { velYMax = Math.max(VEL_Y_MIN, velYMax - VEL_ZOOM_STEP); updateVelScale(); drawVelGraph(); }
+    function velZoomOut()   { velYMax = Math.min(VEL_Y_MAX, velYMax + VEL_ZOOM_STEP); updateVelScale(); drawVelGraph(); }
+    function velZoomReset() { velYMax = 300; updateVelScale(); drawVelGraph(); }
+
+    // Expose to window — required because this is a type="module" script;
+    // functions declared inside modules are NOT on window, so onclick="" fails silently.
+    window.velZoomIn    = velZoomIn;
+    window.velZoomOut   = velZoomOut;
+    window.velZoomReset = velZoomReset;
+
+    // ── PID Graph — Auto Zoom ────────────────────────────────────
+    let pidYMax = 360;  // dynamically updated
+    const targetAngleHistory = [];
+    const currentAngleHistory = [];
+
+    function drawPidGraph() {
+      const canvas = document.getElementById('pid-canvas');
+      if (!canvas || targetAngleHistory.length < 2) return;
+
+      let maxAbs = 0;
+      for (let i = 0; i < targetAngleHistory.length; i++) {
+        const val = Math.abs(targetAngleHistory[i]);
+        if (val > maxAbs) maxAbs = val;
+      }
+      for (let i = 0; i < currentAngleHistory.length; i++) {
+        const val = Math.abs(currentAngleHistory[i]);
+        if (val > maxAbs) maxAbs = val;
+      }
+      
+      // Auto-scale: minimum ±45°, stepping up in 45° increments
+      pidYMax = Math.max(45, Math.ceil(maxAbs / 45) * 45);
+
+      const scaleEl = document.getElementById('pid-scale-val');
+      if (scaleEl) scaleEl.textContent = pidYMax;
+
+      const rect = canvas.getBoundingClientRect();
+      const W = rect.width  || canvas.offsetWidth  || 300;
+      const H = rect.height || canvas.offsetHeight || 90;
+      if (canvas.width !== W)  canvas.width  = W;
+      if (canvas.height !== H) canvas.height = H;
+
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, W, H);
+
+      const midY = H / 2;
+
+      // ── Background grid lines ────────────────────────────────────────
+      ctx.strokeStyle = '#2a2a2a';
+      ctx.lineWidth = 1;
+      [0.25, 0.5].forEach(frac => {
+        const offY = frac * H * 0.5;
+        ctx.setLineDash([2, 4]);
+        ctx.beginPath(); ctx.moveTo(0, midY - offY); ctx.lineTo(W, midY - offY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, midY + offY); ctx.lineTo(W, midY + offY); ctx.stroke();
+      });
+
+      // ── Zero center line ─────────────────────────────────────────────
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = '#555555';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, midY); ctx.lineTo(W, midY); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // ── Scale labels ─────────────────────────────────────────────────
+      ctx.font = '9px var(--font-mono, monospace)';
+      ctx.fillStyle = '#555555';
+      ctx.textAlign = 'left';
+      ctx.fillText(`+${pidYMax}`, 3, 10);
+      ctx.fillText('0',           3, midY - 2);
+      ctx.fillText(`-${pidYMax}`, 3, H - 3);
+
+      const toY = v => midY - (v / pidYMax) * midY;
+      
+      const ptsTarget = targetAngleHistory.map((v, i) => ({
+        x: (i / (targetAngleHistory.length - 1)) * W,
+        y: toY(Math.max(-pidYMax, Math.min(pidYMax, v)))
+      }));
+      
+      const ptsCurrent = currentAngleHistory.map((v, i) => ({
+        x: (i / (currentAngleHistory.length - 1)) * W,
+        y: toY(Math.max(-pidYMax, Math.min(pidYMax, v)))
+      }));
+
+      // ── Target line (Blue, dashed) ──────────────────────────────────────────────────
+      ctx.strokeStyle = '#63b3ed';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ptsTarget.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+      ctx.stroke();
+
+      // ── Current line (Green, solid) ──────────────────────────────────────────────────
+      ctx.setLineDash([]);
+      ctx.strokeStyle = '#48bb78'; // green
+      ctx.lineWidth = 1.5;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ptsCurrent.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+      ctx.stroke();
+    }
+
+    // Expose to window — required because this is a type="module" script;
+    // functions declared inside modules are NOT on window, so onclick="" fails silently.
+    window.velZoomIn    = velZoomIn;
+    window.velZoomOut   = velZoomOut;
+    window.velZoomReset = velZoomReset;
+
+    function updateVelScale() {
+      const el = document.getElementById('vel-scale-val');
+      if (el) el.textContent = velYMax;
+    }
+
+
+    function drawVelGraph() {
+      const canvas = document.getElementById('vel-canvas');
+      if (!canvas) return;
+
+      // Size the canvas backing buffer to match its CSS display size
+      const rect = canvas.getBoundingClientRect();
+      const W = rect.width  || canvas.offsetWidth  || 300;
+      const H = rect.height || canvas.offsetHeight || 90;
+      if (canvas.width !== W)  canvas.width  = W;
+      if (canvas.height !== H) canvas.height = H;
+
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, W, H);
+
+      const midY = H / 2;  // 0-line is ALWAYS at the exact vertical center
+
+      // ── Background grid lines ────────────────────────────────────────
+      ctx.strokeStyle = '#2a2a2a';
+      ctx.lineWidth = 1;
+      // Draw quarter lines (±½ scale, ±¼ scale)
+      [0.25, 0.5].forEach(frac => {
+        const offY = frac * H * 0.5;
+        ctx.setLineDash([2, 4]);
+        ctx.beginPath(); ctx.moveTo(0, midY - offY); ctx.lineTo(W, midY - offY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, midY + offY); ctx.lineTo(W, midY + offY); ctx.stroke();
+      });
+
+      // ── Zero center line ─────────────────────────────────────────────
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = '#555555';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, midY); ctx.lineTo(W, midY); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // ── Scale labels ─────────────────────────────────────────────────
+      ctx.font = '9px var(--font-mono, monospace)';
+      ctx.fillStyle = '#555555';
+      ctx.textAlign = 'left';
+      ctx.fillText(`+${velYMax}`, 3, 10);
+      ctx.fillText('0',           3, midY - 2);
+      ctx.fillText(`-${velYMax}`, 3, H - 3);
+
+      if (speedHistory.length < 2) return;
+
+      // ── Map data to canvas coordinates ───────────────────────────────
+      // Y: 0 RPM → midY. +velYMax → top edge. -velYMax → bottom edge.
+      const toY = v => midY - (v / velYMax) * midY;
+      const pts = speedHistory.map((v, i) => ({
+        x: (i / (speedHistory.length - 1)) * W,
+        y: toY(Math.max(-velYMax, Math.min(velYMax, v)))
+      }));
+
+      // ── Fill area between line and 0-axis ────────────────────────────
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0,   'rgba(246,173,85,0.30)');
+      grad.addColorStop(0.5, 'rgba(246,173,85,0.05)');
+      grad.addColorStop(1,   'rgba(246,173,85,0.30)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, midY);
+      pts.forEach(p => ctx.lineTo(p.x, p.y));
+      ctx.lineTo(pts[pts.length - 1].x, midY);
+      ctx.closePath();
+      ctx.fill();
+
+      // ── Signal line ──────────────────────────────────────────────────
+      ctx.strokeStyle = '#f6ad55';
+      ctx.lineWidth = 1.5;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+      ctx.stroke();
+    }
+
+
+    // ── Display filter ────────────────────────────────────────────────
+    const FILTER_ALPHA = 0.25;
+    const DEAD_BAND_DEG = 0.10;
+    let filteredAngle = null;
+
+    // ── Soft Zero (client-side relative reference) ──────────────────────
+    let softZeroOffset = null;  // raw AS5600 angle captured at "zero"
+    let lastRawAngle = 0;     // most recent unfiltered sample
+
+    // ══════════════════════════════════════════════════════════════════
+    //  SCENE INIT
+    // ══════════════════════════════════════════════════════════════════
+    function initScene() {
+      const canvas = document.getElementById('three-canvas');
+      const vp = document.getElementById('viewport');
+
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(vp.clientWidth, vp.clientHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.2;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x07090f, 0.018);
+
+      camera = new THREE.PerspectiveCamera(45, vp.clientWidth / vp.clientHeight, 0.01, 200);
+      camera.position.set(0.12, 0.08, 0.20);
+
+      controls = new OrbitControls(camera, canvas);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.06;
+      controls.minDistance = 0.05;
+      controls.maxDistance = 0.8;
+      controls.target.set(0, 0, 0);
+
+      // Lighting
+      scene.add(new THREE.AmbientLight(0x1a2a4a, 2.0));
+      const key = new THREE.DirectionalLight(0x63b3ed, 3.5);
+      key.position.set(0.3, 0.5, 0.4);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      scene.add(key);
+      const fill = new THREE.DirectionalLight(0x9f7aea, 1.5);
+      fill.position.set(-0.4, 0.2, -0.3);
+      scene.add(fill);
+      const rim = new THREE.DirectionalLight(0xe0f0ff, 1.0);
+      rim.position.set(0, -0.3, -0.4);
+      scene.add(rim);
+
+      // Floor
+      const floor = new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.MeshStandardMaterial({ color: 0x0d1117, metalness: 0.6, roughness: 0.8, transparent: true, opacity: 0.6 })
+      );
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = -0.04;
+      floor.receiveShadow = true;
+      scene.add(floor);
+      scene.add(new THREE.GridHelper(0.5, 10, 0x1a2a3a, 0x0d1520));
+
+      new ResizeObserver(() => {
+        const w = vp.clientWidth, h = vp.clientHeight;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }).observe(vp);
+
+      setupRotorInteraction();
+      loadModel();
+      animate();
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  INTERACTION  —  Alt + Drag to jog the motor
+    // ══════════════════════════════════════════════════════════════════
+    let isDraggingRotor  = false;
+    let startPointerX    = 0;
+    let dragBaseAngle    = 0;   // encoder cumulative angle captured on mousedown
+    let lastSendTime     = 0;
+    const DRAG_THRESHOLD_PX  = 4;    // px before first command fires
+    const DRAG_DEG_PER_PX    = 0.5;  // 1 px drag = 0.5° setpoint change (tune as needed)
+    const DRAG_MAX_DELTA_DEG = 180.0; // max single-command jump (mirrors firmware clamp)
+
+    function sendSerial(obj) {
+      if (serialActive && serialPort && serialPort.writable) {
+        try {
+          const writer = serialPort.writable.getWriter();
+          writer.write(new TextEncoder().encode(JSON.stringify(obj) + '\n'));
+          writer.releaseLock();
+          console.log('[Serial TX]', JSON.stringify(obj));
+        } catch (_) {}
+      }
+    }
+
+    function sendSetpoint(deg) {
+      sendSerial({ setpoint: Math.round(deg * 100) / 100 });
+    }
+
+    function setupRotorInteraction() {
+      const canvas = document.getElementById('three-canvas');
+
+      canvas.addEventListener('pointerdown', (e) => {
+        if (!e.altKey) return;
+        isDraggingRotor = true;
+        controls.enabled = false;
+        startPointerX = e.clientX;
+        // Use the ENCODER's last reported cumulative angle as drag base,
+        // NOT the JS animation accumulator (targetAngleDeg) which may differ
+        // from the firmware's reference frame after a page reload.
+        dragBaseAngle = lastRawAngle;  // set by updateUI on every telemetry sample
+        e.preventDefault();
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        if (!isDraggingRotor) return;
+
+        const deltaX = e.clientX - startPointerX;
+
+        // Require a minimum drag before sending anything — prevents an
+        // accidental motor command on a pure Alt+click.
+        if (Math.abs(deltaX) < DRAG_THRESHOLD_PX) return;
+
+        // Convert px → degrees and clamp to safety window.
+        const rawDeltaDeg = deltaX * DRAG_DEG_PER_PX;
+        const clampedDeltaDeg = Math.max(-DRAG_MAX_DELTA_DEG,
+                                  Math.min( DRAG_MAX_DELTA_DEG, rawDeltaDeg));
+        const newSetpoint = dragBaseAngle + clampedDeltaDeg;
+
+        // Update 3D visualisation
+        let delta3d = newSetpoint - (targetAngleDeg % 360);
+        delta3d = ((delta3d % 360) + 540) % 360 - 180;
+        targetAngleDeg += delta3d;
+
+        // Rate-limit serial sends to 20 Hz
+        const now = performance.now();
+        if (now - lastSendTime > 50) {
+          lastSendTime = now;
+          sendSetpoint(newSetpoint);
+        }
+      });
+
+      window.addEventListener('pointerup', () => {
+        if (!isDraggingRotor) return;
+        isDraggingRotor = false;
+        controls.enabled = true;
+
+        // Send a final "hold here" command so the motor locks onto the
+        // released position rather than the last rate-limited position.
+        const deltaX = (event?.clientX ?? startPointerX) - startPointerX;
+        if (Math.abs(deltaX) >= DRAG_THRESHOLD_PX) {
+          const rawDeltaDeg = deltaX * DRAG_DEG_PER_PX;
+          const clampedDeltaDeg = Math.max(-DRAG_MAX_DELTA_DEG,
+                                    Math.min( DRAG_MAX_DELTA_DEG, rawDeltaDeg));
+          sendSetpoint(dragBaseAngle + clampedDeltaDeg);
+        }
+      });
+
+      window.addEventListener('pointerleave', () => {
+        if (isDraggingRotor) {
+          isDraggingRotor = false;
+          controls.enabled = true;
+        }
+      });
+    }
+
+
+
+    // ══════════════════════════════════════════════════════════════════
+    //  LOAD GLB
+    // ══════════════════════════════════════════════════════════════════
+    function loadModel() {
+      const loaderEl = document.getElementById('loader');
+      const loaderMsg = document.getElementById('loader-msg');
+      const loaderDetail = document.getElementById('loader-detail');
+
+      new GLTFLoader().load(
+        CONFIG.modelPath,
+        (gltf) => {
+          const model = gltf.scene;
+          const box = new THREE.Box3().setFromObject(model);
+          const size = new THREE.Vector3();
+          box.getSize(size);
+          const scale = 0.08 / Math.max(size.x, size.y, size.z);
+          model.scale.setScalar(scale);
+          box.setFromObject(model);
+          const center = new THREE.Vector3();
+          box.getCenter(center);
+          model.position.sub(center);
+          model.traverse((child) => {
+            if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
+          });
+          const allMeshes = [];
+          model.traverse((child) => { if (child.isMesh) allMeshes.push(child); });
+          allMeshesGlobal = allMeshes;   // store globally for the mesh inspector
+          console.group('GLB Mesh Map');
+          allMeshes.forEach((m, i) => {
+            const triCount = m.geometry.index ? m.geometry.index.count / 3 : '?';
+            console.log(`[Mesh ${i}] triangles=${triCount} parent="${m.parent?.name}"`);
+          });
+          console.groupEnd();
+          const rawShaftMeshes = CONFIG.shaftMeshIndices.map(i => allMeshes[i]).filter(Boolean);
+          if (rawShaftMeshes.length > 0) {
+            motorBody = model;
+            scene.add(model);
+            model.updateWorldMatrix(true, true);
+            shaftPivot = buildShaftPivot(rawShaftMeshes);
+            shaftMeshArray = [shaftPivot];
+            console.log(`✅ Shaft pivot created for indices [${CONFIG.shaftMeshIndices}]`);
+            document.getElementById('model-banner').classList.add('hidden');
+          } else {
+            console.warn('⚠️ No shaft meshes at indices', CONFIG.shaftMeshIndices);
+            motorBody = model;
+            scene.add(model);
+            const banner = document.getElementById('model-banner');
+            banner.textContent = `⚠️ Shaft not found at indices [${CONFIG.shaftMeshIndices}] — GLB has ${allMeshes.length} meshes. Check F12 console.`;
+            banner.classList.remove('hidden');
+          }
+          loaderEl.classList.add('hidden');
+          setTimeout(() => { loaderEl.style.display = 'none'; }, 700);
+          buildMeshInspector(allMeshes);  // populate inspector buttons
+        },
+        (prog) => {
+          if (prog.total > 0) {
+            loaderDetail.textContent = `${CONFIG.modelPath} · ${Math.round(prog.loaded / prog.total * 100)}%`;
+          }
+        },
+        (err) => {
+          console.warn('GLB not found, using procedural placeholder.', err.message || err);
+          loaderMsg.textContent = 'GLB not found — placeholder model';
+          loaderDetail.textContent = 'Place nema17.glb alongside this HTML file';
+          buildProceduralMotor();
+          setTimeout(() => {
+            loaderEl.classList.add('hidden');
+            setTimeout(() => { loaderEl.style.display = 'none'; }, 700);
+          }, 1500);
+        }
+      );
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  PROCEDURAL NEMA 17 PLACEHOLDER
+    // ══════════════════════════════════════════════════════════════════
+    function buildProceduralMotor() {
+      const group = new THREE.Group();
+      const s = 0.001;
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1a1f2e, metalness: 0.85, roughness: 0.25 });
+      const body = new THREE.Mesh(new THREE.BoxGeometry(42 * s, 38 * s, 42 * s), bodyMat);
+      body.castShadow = true;
+      group.add(body);
+      const faceMat = new THREE.MeshStandardMaterial({ color: 0x0f1520, metalness: 0.9, roughness: 0.2 });
+      const face = new THREE.Mesh(new THREE.BoxGeometry(42 * s, 2 * s, 42 * s), faceMat);
+      face.position.y = 20 * s;
+      group.add(face);
+      const screwMat = new THREE.MeshStandardMaterial({ color: 0x2a3a5a, metalness: 0.7, roughness: 0.4 });
+      [[14.5, 14.5], [14.5, -14.5], [-14.5, 14.5], [-14.5, -14.5]].forEach(([x, z]) => {
+        const sm = new THREE.Mesh(new THREE.CylinderGeometry(1.5 * s, 1.5 * s, 3 * s, 12), screwMat);
+        sm.position.set(x * s, 21 * s, z * s); sm.rotation.x = Math.PI / 2;
+        group.add(sm);
+      });
+      const boss = new THREE.Mesh(new THREE.CylinderGeometry(11 * s, 11 * s, 2 * s, 32),
+        new THREE.MeshStandardMaterial({ color: 0x2c3e5e, metalness: 0.8, roughness: 0.3 }));
+      boss.position.y = 21.5 * s; group.add(boss);
+
+      const shaftGroup = new THREE.Group();
+      shaftGroup.name = 'Shaft';
+      const shaftMat = new THREE.MeshStandardMaterial({ color: 0xb0bec5, metalness: 0.95, roughness: 0.15 });
+      const shaftCyl = new THREE.Mesh(new THREE.CylinderGeometry(2.5 * s, 2.5 * s, 24 * s, 20), shaftMat);
+      shaftCyl.position.y = (21 + 12) * s; shaftCyl.castShadow = true; shaftGroup.add(shaftCyl);
+      const flat = new THREE.Mesh(new THREE.BoxGeometry(5 * s, 20 * s, 0.8 * s),
+        new THREE.MeshStandardMaterial({ color: 0x8090a0, metalness: 0.9, roughness: 0.2 }));
+      flat.position.set(0, (21 + 11) * s, 2.2 * s); shaftGroup.add(flat);
+      const markMat = new THREE.MeshStandardMaterial({ color: 0x63b3ed, emissive: 0x1a3a6a });
+      const mark = new THREE.Mesh(new THREE.BoxGeometry(0.5 * s, 18 * s, 5.2 * s), markMat);
+      mark.position.y = (21 + 11) * s; shaftGroup.add(mark);
+      group.add(shaftGroup);
+      shaftMeshArray = [shaftGroup];
+
+      [0xe53e3e, 0x3182ce, 0x38a169, 0xdd6b20].forEach((c, i) => {
+        const w = new THREE.Mesh(new THREE.CylinderGeometry(0.8 * s, 0.8 * s, 15 * s, 8),
+          new THREE.MeshStandardMaterial({ color: c }));
+        w.position.set((-6 + i * 4) * s, -27 * s, 18 * s); w.rotation.x = Math.PI / 4;
+        group.add(w);
+      });
+      const glow = new THREE.Mesh(new THREE.BoxGeometry(10 * s, 1.5 * s, 2 * s),
+        new THREE.MeshStandardMaterial({ color: 0x63b3ed, emissive: 0x1a4a8a, emissiveIntensity: 0.8 }));
+      glow.position.set(0, -19 * s, 21.5 * s); group.add(glow);
+      group.position.y = -0.01;
+      motorBody = group;
+      scene.add(group);
+      document.getElementById('model-banner').innerHTML =
+        `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    Using <strong style="margin:0 4px">procedural placeholder</strong> &mdash; place
+    <code style="background:rgba(0,0,0,0.3);padding:1px 5px;border-radius: 0px;">nema17.glb</code>
+    alongside this HTML and reload.`;
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  RENDER LOOP
+    // ══════════════════════════════════════════════════════════════════
+
+    /**
+     * Standard linear lerp. We use cumulative angles so we don't need to wrap!
+     */
+    function lerp(current, target, alpha) {
+      return current + (target - current) * alpha;
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      if (shaftMeshArray.length > 0 && hasData) {
+        currentAngleDeg = lerp(currentAngleDeg, targetAngleDeg, 0.12);
+        const dir = CONFIG.rotationInverted ? -1 : 1;
+        const rad = THREE.MathUtils.degToRad(currentAngleDeg) * dir;
+        shaftMeshArray.forEach(pivot => {
+          if (CONFIG.rotationAxis === 'Y') pivot.rotation.y = rad;
+          else if (CONFIG.rotationAxis === 'Z') pivot.rotation.z = rad;
+          else pivot.rotation.x = rad;
+        });
+      }
+      renderer.render(scene, camera);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  SHARED UI UPDATE
+    // ══════════════════════════════════════════════════════════════════
+    function updateUI(data) {
+      hasData = true;
+      const rawAngle = data.joint1 ?? 0;
+      lastRawAngle = rawAngle;
+
+      const cumAngle = data.cumulative != null ? data.cumulative : rawAngle;
+
+      // ── EMA filter on continuous cumulative angle ──────────────
+      if (filteredAngle === null) {
+        filteredAngle = cumAngle;
+      } else {
+        filteredAngle = FILTER_ALPHA * cumAngle + (1 - FILTER_ALPHA) * filteredAngle;
+      }
+
+      // ── Apply soft-zero for display ──────────────
+      let displayAngle = filteredAngle;
+      if (softZeroOffset !== null) {
+        displayAngle -= softZeroOffset;
+      }
+      
+      let displayMod = ((displayAngle % 360) + 360) % 360;
+
+      // Dead-band: skip DOM updates when jitter is sub-resolution
+      // We check displayMod vs the text content (which is also wrapped)
+      let oldDisplay = parseFloat(document.getElementById('angle-display').textContent) || 0;
+      // Handle wrap-around in deadband check so it doesn't always trigger at the 359->0 boundary
+      let diff = Math.abs(displayMod - oldDisplay);
+      if (diff > 180) diff = 360 - diff;
+      const displayChanged = diff >= DEAD_BAND_DEG;
+
+      // ── 3-D rotation target ───────────────────────────────────
+      if (!isDraggingRotor) {
+        let visualTarget = cumAngle;
+        if (softZeroOffset !== null) {
+           visualTarget -= softZeroOffset;
+        }
+        targetAngleDeg = visualTarget;
+      }
+
+      // ── DOM updates (gated by dead-band) ─────────────────────────
+      if (displayChanged) {
+        document.getElementById('angle-display').textContent = displayMod.toFixed(2);
+
+        const circ = 2 * Math.PI * 70;
+        document.getElementById('gauge-fill').style.strokeDashoffset = circ * (1 - displayMod / 360);
+        document.getElementById('gauge-val').textContent = displayMod.toFixed(1);
+        document.getElementById('gauge-needle').style.transform = `rotate(${displayMod}deg)`;
+
+        document.getElementById('st-angle').textContent = `${filteredAngle.toFixed(2)}\u00b0`;
+        if (data.speed_rpm != null) {
+          document.getElementById('st-speed').textContent = `${data.speed_rpm.toFixed(1)} RPM`;
+          document.getElementById('speed-display').textContent = data.speed_rpm.toFixed(1);
+        } else {
+          document.getElementById('st-speed').textContent = `--- RPM`;
+          document.getElementById('speed-display').textContent = `---`;
+        }
+        document.getElementById('st-cumulative').textContent =
+          data.cumulative != null ? `${data.cumulative.toFixed(2)}\u00b0` : `${filteredAngle.toFixed(2)}\u00b0`;
+      }
+
+      // Low-frequency fields — update every sample (not noisy)
+      document.getElementById('st-raw').textContent = data.raw != null ? `${data.raw} / 4096` : '---';
+
+      const ok = !data.magnet_weak && !data.magnet_strong;
+      const cls = ok ? 'ok' : (data.magnet_weak ? 'warn' : 'err');
+      document.getElementById('st-magnet-status').textContent = data.status ?? 'Live';
+      document.getElementById('st-magnet-status').className = `stat-value ${cls}`;
+      document.getElementById('st-magnet-detected').textContent = data.magnet_detected != null ? (data.magnet_detected ? 'YES \u2713' : 'NO \u2717') : '---';
+      document.getElementById('st-magnet-detected').className = `stat-value ${data.magnet_detected ? 'ok' : 'err'}`;
+      const sig = data.magnet_detected && ok ? 'Optimal' : (data.magnet_weak ? 'Too Weak' : (data.magnet_strong ? 'Too Strong' : '---'));
+      document.getElementById('st-magnet-signal').textContent = sig;
+      document.getElementById('st-magnet-signal').className = `stat-value ${cls}`;
+
+      if (data.agc != null) {
+        document.getElementById('agc-val').textContent = data.agc;
+        document.getElementById('agc-bar').style.width = `${(data.agc / 255) * 100}%`;
+      }
+
+      // Live PID error display
+      if (motorMode === 'pid') {
+        const tgtEl = document.getElementById('target-angle-input');
+        if (tgtEl) {
+          const tgt = parseFloat(tgtEl.value) || 0;
+          const errVal = tgt - filteredAngle;
+          const errEl = document.getElementById('pid-error-val');
+          if (errEl) errEl.textContent = `${errVal.toFixed(2)}\u00b0`;
+        }
+      }
+
+      const tgtEl = document.getElementById('target-angle-input');
+      const tgtVal = tgtEl ? (parseFloat(tgtEl.value) || 0) : 0;
+      targetAngleHistory.push(tgtVal);
+      if (targetAngleHistory.length > CONFIG.historyLength) targetAngleHistory.shift();
+
+      currentAngleHistory.push(filteredAngle);
+      if (currentAngleHistory.length > CONFIG.historyLength) currentAngleHistory.shift();
+
+      drawPidGraph();
+
+      const speedVal = data.speed_rpm ?? 0;
+      speedHistory.push(speedVal);
+      if (speedHistory.length > CONFIG.historyLength) speedHistory.shift();
+      drawVelGraph();
+
+      document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+      updateCount++;
+      const now = performance.now();
+      if (now - lastFpsTime >= 1000) {
+        document.getElementById('hz-badge').textContent = `${updateCount} Hz`;
+        updateCount = 0;
+        lastFpsTime = now;
+      }
+    }
+
+    function setConnected(ok, label) {
+      const pill = document.getElementById('conn-pill');
+      const lbl = document.getElementById('conn-label');
+      pill.className = ok ? 'connected' : 'disconnected';
+      lbl.textContent = label ?? (ok ? 'Live' : 'Offline');
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  OFFLINE MODE — Web Serial API
+    // ══════════════════════════════════════════════════════════════════
+    let serialPort = null;
+    let serialReader = null;
+    let serialActive = false;
+    let serialLineBuf = '';
+
+    function isSerialSupported() {
+      return 'serial' in navigator;
+    }
+
+    window.serialConnect = async () => {
+      if (!isSerialSupported()) {
+        document.getElementById('serial-warn').classList.add('visible');
+        setConnected(false, 'Serial unavailable');
+        return;
+      }
+
+      // Prevent double-connect
+      if (serialActive) return;
+
+      try {
+        // Let the user pick a port
+        serialPort = await navigator.serial.requestPort();
+
+        document.getElementById('conn-pill').className = 'connecting';
+        document.getElementById('conn-label').textContent = 'Serial · Opening\u2026';
+
+        // Open WITHOUT bufferSize — some browsers/drivers reject the option
+        // for native USB CDC ports (e.g. ESP32-C6 built-in USB).
+        await serialPort.open({ baudRate: 115200 });
+
+        serialActive = true;
+        updateSerialUI(true, serialPort);
+
+        document.getElementById('conn-label').textContent = 'Serial · Waiting for boot\u2026';
+
+        // ── ESP32-C6 USB-CDC reset delay ───────────────────────────────
+        // Opening the port asserts DTR which triggers a hard reset on the
+        // ESP32-C6.  Wait ~2 s for the chip to boot and start streaming
+        // before we send the 'j' command.
+        await new Promise(r => setTimeout(r, 2000));
+
+        if (!serialActive) return; // user disconnected during wait
+
+        // Send 'j' to enable full JSON-only stream
+        try {
+          const writer = serialPort.writable.getWriter();
+          await writer.write(new TextEncoder().encode('j\n'));
+          writer.releaseLock();
+        } catch (we) {
+          console.warn('[Serial] Could not send j command:', we.message);
+          // Non-fatal — stream may already be in JSON mode
+        }
+
+        document.getElementById('conn-label').textContent = 'Serial · Connecting\u2026';
+
+        // Start read loop
+        serialReadLoop();
+
+      } catch (err) {
+        console.error('[Serial] Connect error:', err);
+        // Show specific error so user can diagnose
+        const msg = err.name === 'NetworkError'
+          ? 'Port in use — close Serial Monitor first'
+          : (err.message || err.name || 'Unknown error');
+        setConnected(false, `Serial · ${msg}`);
+        serialWarn(msg);
+        serialActive = false;
+        if (serialPort) {
+          try { await serialPort.close(); } catch (_) { }
+          serialPort = null;
+        }
+        updateSerialUI(false, null);
+      }
+    };
+
+    function serialWarn(msg) {
+      const el = document.getElementById('serial-warn');
+      el.textContent = `\u26A0\uFE0F Serial error: ${msg}. If port is busy, close PlatformIO Serial Monitor first.`;
+      el.classList.add('visible');
+      setTimeout(() => el.classList.remove('visible'), 8000);
+    }
+
+    window.serialDisconnect = async () => {
+      serialActive = false;
+      if (serialReader) {
+        try { await serialReader.cancel(); } catch (_) { }
+        serialReader = null;
+      }
+      if (serialPort) {
+        try {
+          // Restore human-readable mode on the ESP32 before closing
+          if (serialPort.writable) {
+            const writer = serialPort.writable.getWriter();
+            await writer.write(new TextEncoder().encode('j\n'));
+            writer.releaseLock();
+          }
+        } catch (_) { }
+        try { await serialPort.close(); } catch (_) { }
+        serialPort = null;
+      }
+      serialLineBuf = '';
+      updateSerialUI(false, null);
+      setConnected(false, 'Serial · Disconnected');
+    };
+
+    async function serialReadLoop() {
+      const decoder = new TextDecoder();
+      let firstDataReceived = false;
+
+      try {
+        while (serialPort && serialPort.readable && serialActive) {
+          serialReader = serialPort.readable.getReader();
+          try {
+            while (serialActive) {
+              const { value, done } = await serialReader.read();
+              if (done) break;
+              if (!value || value.length === 0) continue;
+
+              if (!firstDataReceived) {
+                firstDataReceived = true;
+                console.log('[Serial] First data received — port is live');
+              }
+
+              serialLineBuf += decoder.decode(value, { stream: true });
+
+              // Process all complete newline-terminated lines
+              const lines = serialLineBuf.split('\n');
+              serialLineBuf = lines.pop(); // keep incomplete tail
+
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                try {
+                  const data = JSON.parse(trimmed);
+                  if (data.joint1 !== undefined) {
+                    updateUI(data);
+                    setConnected(true, 'Serial \u00b7 Live');
+                  }
+                } catch (_) {
+                  // Startup banners and human-readable lines — silently skip
+                }
+              }
+            }
+          } catch (innerErr) {
+            console.error('[Serial] Inner read error:', innerErr);
+          } finally {
+            try { serialReader.releaseLock(); } catch (_) { }
+            serialReader = null;
+          }
+        }
+      } catch (err) {
+        console.error('[Serial] Read loop error:', err);
+      }
+
+      // Port gone or stop requested
+      if (serialActive) {
+        serialActive = false;
+        updateSerialUI(false, null);
+        setConnected(false, 'Serial \u00b7 Disconnected');
+      }
+    }
+
+    function updateSerialUI(connected, port) {
+      const portLabel = document.getElementById('serial-port-label');
+      const btnConnect = document.getElementById('btn-serial-connect');
+      const btnDisconnect = document.getElementById('btn-serial-disconnect');
+
+      if (connected && port) {
+        const info = port.getInfo();
+        portLabel.textContent = info.usbVendorId
+          ? `VID:${info.usbVendorId.toString(16).toUpperCase()} PID:${info.usbProductId.toString(16).toUpperCase()}`
+          : 'Serial Port';
+        btnConnect.style.display = 'none';
+        btnDisconnect.style.display = '';
+      } else {
+        portLabel.textContent = 'No port selected';
+        btnConnect.style.display = '';
+        btnDisconnect.style.display = 'none';
+      }
+    }
+
+
+    // ════════════════════════════════════════════════════════════════
+    //  MOTOR MODE CONTROL
+    // ════════════════════════════════════════════════════════════════
+    window.setMotorMode = function(mode) {
+      motorMode = mode;
+      const btnC  = document.getElementById('btn-mode-continuous');
+      const btnP  = document.getElementById('btn-mode-pid');
+      const pidS  = document.getElementById('pid-section');
+      const contS = document.getElementById('continuous-section');
+      if (mode === 'pid') {
+        btnC.className = 'motor-mode-btn';
+        btnP.className = 'motor-mode-btn active-pid';
+        pidS.classList.add('visible');
+        if (contS) contS.classList.remove('visible');
+      } else {
+        btnC.className = 'motor-mode-btn active-continuous';
+        btnP.className = 'motor-mode-btn';
+        pidS.classList.remove('visible');
+        if (contS) contS.classList.add('visible');
+      }
+      sendSerial({ mode: mode });
+    };
+
+    window.sendContinuousSpeed = function(rpm) {
+      sendSerial({ mode: "continuous", rpm: rpm });
+    };
+
+    // ── Target Angle ─────────────────────────────────────────────────────
+    window.sendTargetAngle = function() {
+      const inp = document.getElementById('target-angle-input');
+      if (!inp) return;
+      const val = parseFloat(inp.value);
+      if (!isNaN(val)) sendSerial({ setpoint: Math.round(val * 100) / 100 });
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const inp = document.getElementById('target-angle-input');
+      if (inp) inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') window.sendTargetAngle(); });
+    });
+
+    // ── PID Sliders ──────────────────────────────────────────────────────
+    window.updatePIDDisplay = function() {
+      const kp = parseFloat(document.getElementById('kp-slider').value);
+      const ki = parseFloat(document.getElementById('ki-slider').value);
+      const kd = parseFloat(document.getElementById('kd-slider').value);
+      document.getElementById('kp-val').textContent = kp.toFixed(1);
+      document.getElementById('ki-val').textContent = ki.toFixed(2);
+      document.getElementById('kd-val').textContent = kd.toFixed(2);
+    };
+
+    window.sendPIDGains = function() {
+      const kp = parseFloat(document.getElementById('kp-slider').value);
+      const ki = parseFloat(document.getElementById('ki-slider').value);
+      const kd = parseFloat(document.getElementById('kd-slider').value);
+      sendSerial({ kp, ki, kd });
+    };
+
+    // ══════════════════════════════════════════════════════════════════
+    //  CONTROLS
+    // ══════════════════════════════════════════════════════════════════
+    window.zeroPosition = async () => {
+      if (serialActive && serialPort && serialPort.writable) {
+        try {
+          const writer = serialPort.writable.getWriter();
+          await writer.write(new TextEncoder().encode('z\n'));
+          writer.releaseLock();
+        } catch (e) { console.warn('Zero failed:', e.message); }
+      }
+      speedHistory.length = 0;
+      targetAngleDeg = 0; currentAngleDeg = 0;
+    };
+
+    window.toggleAutoRotate = () => {
+      controls.autoRotate = !controls.autoRotate;
+      controls.autoRotateSpeed = 1.5;
+    };
+
+    window.resetCamera = () => {
+      camera.position.set(0.12, 0.08, 0.20);
+      controls.target.set(0, 0, 0);
+      controls.update();
+    };
+
+    window.toggleWireframe = () => {
+      wireframeMode = !wireframeMode;
+      scene.traverse((c) => {
+        if (!c.isMesh) return;
+        (Array.isArray(c.material) ? c.material : [c.material]).forEach(m => { m.wireframe = wireframeMode; });
+      });
+    };
+
+    window.updateShaftIndices = (val) => {
+      const indices = val.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+      if (indices.length === 0) return;
+      CONFIG.shaftMeshIndices = indices;
+      if (!motorBody) return;
+      const allMeshes = [];
+      motorBody.traverse(c => { if (c.isMesh) allMeshes.push(c); });
+      if (shaftPivot) { shaftPivot.traverse(c => { if (c.isMesh) allMeshes.push(c); }); }
+      const newMeshes = indices.map(i => allMeshes[i]).filter(Boolean);
+      const banner = document.getElementById('model-banner');
+      if (newMeshes.length > 0) {
+        if (shaftPivot) scene.remove(shaftPivot);
+        motorBody.updateWorldMatrix(true, true);
+        shaftPivot = buildShaftPivot(newMeshes);
+        shaftMeshArray = [shaftPivot];
+        currentAngleDeg = 0; targetAngleDeg = 0;
+        banner.classList.add('hidden');
+        console.log(`✅ Shaft pivot rebuilt for [${indices}]`);
+      } else {
+        banner.textContent = `⚠️ No meshes at [${indices}]. GLB has ${allMeshes.length} meshes (0–${allMeshes.length - 1}).`;
+        banner.classList.remove('hidden');
+      }
+    };
+
+    /**
+     * Create a pivot Group whose position = the shaft mesh's CAD origin.
+     *
+     * WHY world position, not bounding-box centre:
+     *   Bounding-box centre shifts whenever asymmetric geometry (flags, keys,
+     *   couplers) is added.  The mesh's world position reflects the origin that
+     *   was set in the CAD tool — as long as the CAD origin is on the rotation
+     *   axis this is always correct, regardless of what shape is attached.
+     *
+     * CAD REQUIREMENT (one-time setup):
+     *   • Blender  → select shaft → Object > Set Origin > Origin to 3D Cursor
+     *                (place cursor on shaft axis centre first)
+     *   • Fusion360 → move component origin to shaft centreline
+     *   • FreeCAD  → set Part Placement.Position to shaft axis point
+     */
+    function buildShaftPivot(meshes) {
+      // 1. Use the first shaft mesh's world-space origin as the rotation axis.
+      //    This equals the origin the designer set in the CAD tool.
+      const axisPoint = new THREE.Vector3();
+      meshes[0].updateWorldMatrix(true, false);
+      meshes[0].getWorldPosition(axisPoint);
+
+      // Sanity-check: if the origin looks degenerate (all zeros and the mesh
+      // clearly isn't centred there) fall back to bounding-box centre.
+      const box = new THREE.Box3();
+      meshes.forEach(m => { m.updateWorldMatrix(true, false); box.expandByObject(m); });
+      const bbCenter = new THREE.Vector3();
+      box.getCenter(bbCenter);
+
+      // If the CAD origin is further than half the object's diagonal from the
+      // bounding-box centre it is likely wrong — warn and use bb centre.
+      const diagonal = box.min.distanceTo(box.max);
+      const originOffset = axisPoint.distanceTo(bbCenter);
+      if (originOffset > diagonal * 0.6) {
+        console.warn(
+          `[ShaftPivot] Mesh origin is far from bounding-box centre ` +
+          `(${originOffset.toFixed(4)} > ${(diagonal * 0.6).toFixed(4)}). ` +
+          `Using bounding-box centre. Fix: set the shaft CAD origin to the rotation axis.`
+        );
+        axisPoint.copy(bbCenter);
+      }
+
+      // 2. Place pivot at axis point
+      const pivot = new THREE.Group();
+      pivot.name = 'ShaftPivot';
+      pivot.position.copy(axisPoint);
+      scene.add(pivot);
+
+      // 3. Re-parent meshes — .attach() preserves world transform so each
+      //    mesh's local position becomes relative to the pivot (axis) origin.
+      meshes.forEach(m => pivot.attach(m));
+
+      console.log(
+        `[ShaftPivot] axis = (${axisPoint.x.toFixed(4)}, ` +
+        `${axisPoint.y.toFixed(4)}, ${axisPoint.z.toFixed(4)})`
+      );
+      return pivot;
+    }
+
+
+    window.setAxis = (axis) => {
+      CONFIG.rotationAxis = axis;
+      ['X', 'Y', 'Z'].forEach(a => {
+        document.getElementById(`axis-${a.toLowerCase()}`).className = `btn ${a === axis ? 'btn-primary' : 'btn-neutral'}`;
+      });
+      shaftMeshArray.forEach(m => m.rotation.set(0, 0, 0));
+      currentAngleDeg = 0; targetAngleDeg = 0;
+    };
+
+    window.toggleInvert = () => {
+      CONFIG.rotationInverted = !CONFIG.rotationInverted;
+      const btn = document.getElementById('btn-invert');
+      btn.className = `btn ${CONFIG.rotationInverted ? 'btn-primary' : 'btn-neutral'}`;
+      btn.textContent = CONFIG.rotationInverted ? '\u21BA Inverted' : '\u2192 Normal';
+    };
+
+    // ── Mesh Inspector ────────────────────────────────────────────────
+    // Builds numbered buttons (one per mesh in the GLB) in the panel.
+    // Clicking highlights that mesh amber for 2 s.
+    function buildMeshInspector(meshes) {
+      const container = document.getElementById('mesh-inspector-btns');
+      if (!container) return;
+      container.innerHTML = '';
+
+      meshes.forEach((mesh, i) => {
+        const triCount = mesh.geometry.index
+          ? (mesh.geometry.index.count / 3).toLocaleString()
+          : '?';
+        const isShaft = CONFIG.shaftMeshIndices.includes(i);
+
+        const btn = document.createElement('button');
+        btn.id = `mesh-btn-${i}`;
+        btn.title = `Mesh ${i} \u2022 ${triCount} triangles`;
+        btn.style.cssText = [
+          'padding:4px 8px',
+          'border-radius:0px',
+          'font-size:10px',
+          'font-family:var(--font-mono)',
+          'cursor:pointer',
+          'border:1px solid var(--border)',
+          'transition:all 0.2s',
+          `background:${isShaft ? 'rgba(246,173,85,0.15)' : 'var(--bg-panel)'}`,
+          `color:${isShaft ? 'var(--amber)' : 'var(--text-mid)'}`
+        ].join(';');
+        btn.textContent = `M${i}`;
+
+        let flashTimer = null;
+        btn.addEventListener('click', () => {
+          clearTimeout(flashTimer);
+          highlightMesh(i);
+          btn.style.background = 'rgba(246,173,85,0.35)';
+          btn.style.color = '#fff';
+          flashTimer = setTimeout(() => {
+            clearHighlight();
+            const shaft = CONFIG.shaftMeshIndices.includes(i);
+            btn.style.background = shaft ? 'rgba(246,173,85,0.15)' : 'var(--bg-panel)';
+            btn.style.color = shaft ? 'var(--amber)' : 'var(--text-mid)';
+          }, 2000);
+        });
+
+        container.appendChild(btn);
+      });
+
+      // Update shaft-hint with mesh count
+      const hint = document.getElementById('shaft-hint');
+      if (hint) hint.textContent = `${meshes.length} meshes in model. Click M# below to identify.`;
+    }
+
+    let _highlightOrigMats = new Map();
+
+    function highlightMesh(index) {
+      clearHighlight();
+      const mesh = allMeshesGlobal[index];
+      if (!mesh) return;
+
+      // Also check shaftPivot children
+      const target = mesh;
+      const mats = Array.isArray(target.material) ? target.material : [target.material];
+      mats.forEach(m => {
+        _highlightOrigMats.set(m, { emissive: m.emissive?.clone(), emissiveIntensity: m.emissiveIntensity });
+        if (m.emissive) m.emissive.set(0xf6ad55);
+        m.emissiveIntensity = 0.8;
+      });
+    }
+
+    function clearHighlight() {
+      _highlightOrigMats.forEach((orig, m) => {
+        if (orig.emissive && m.emissive) m.emissive.copy(orig.emissive);
+        m.emissiveIntensity = orig.emissiveIntensity;
+      });
+      _highlightOrigMats.clear();
+    }
+
+    // ── Soft Zero Controls ────────────────────────────────────────────
+    window.setSoftZero = () => {
+      softZeroOffset = lastRawAngle;
+      filteredAngle = null; // force immediate jump on next sample
+
+      document.getElementById('btn-sw-zero').style.display = 'none';
+      document.getElementById('btn-clear-zero').style.display = '';
+      document.getElementById('zero-status').classList.add('visible');
+      document.getElementById('zero-offset-val').textContent = `${softZeroOffset.toFixed(2)}\u00b0`;
+
+      // Update big label to show we are in relative mode
+      document.getElementById('angle-label').textContent = 'Relative Angle';
+      document.getElementById('angle-label').style.color = 'var(--amber)';
+    };
+
+    window.clearSoftZero = () => {
+      softZeroOffset = null;
+      filteredAngle = null; // force immediate jump
+
+      document.getElementById('btn-sw-zero').style.display = '';
+      document.getElementById('btn-clear-zero').style.display = 'none';
+      document.getElementById('zero-status').classList.remove('visible');
+
+      // Restore big label
+      document.getElementById('angle-label').textContent = 'Base Azimuth Angle';
+      document.getElementById('angle-label').style.color = 'var(--text-lo)';
+    };
+
+
+    // ══════════════════════════════════════════════════════════════════
+    //  BOOT
+    // ══════════════════════════════════════════════════════════════════
+    initScene();
+
+    // Boot in serial-ready state
+    if (!isSerialSupported()) {
+      document.getElementById('serial-warn').classList.add('visible');
+      setConnected(false, 'Serial unavailable');
+    } else {
+      setConnected(false, 'Disconnected');
+    }
+  </script>
+</body>
+
+</html>
