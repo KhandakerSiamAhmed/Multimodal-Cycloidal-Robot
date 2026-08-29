@@ -1,83 +1,93 @@
-# Project Overview
+# 3-DOF Prototype Collaborative Robotic Manipulator (Cobot)
 
-## Multimodal Cycloidal-Actuated Manipulator
-### A Collaborative Surgical Robotic Arm with Decentralised Edge-Compute Control
+## Project Overview
 
----
-
-## Objective
-
-This project presents a **three-degree-of-freedom collaborative robotic manipulator** designed for remote surgical assistance through master-slave teleoperation. The arm is built around custom 3D-printed cycloidal gearboxes and a wireless decentralised control architecture.
-
-It rotates at the base, lifts at the shoulder, and bends at the elbow. A compliant fin-ray gripper is mounted at the end effector for conformable grasping of surgical instruments and delicate objects. The system is classified as a **cobot** — a collaborative robot that augments the surgeon's capability rather than replacing it.
-
-Multiple input modalities are supported and managed through a unified state machine on the master controller:
-*   **Real-time teleoperation**
-*   **Computer vision-based object detection**
-*   **Voice commands**
+This project presents a **3-DOF prototype collaborative robotic manipulator (cobot)** developed as a modular platform for automated light-assembly and laboratory tasks. Built around a decentralized wireless control architecture, low-cost off-the-shelf hardware, and 3D-printed cycloidal gearboxes, the system augments human operation through direct multi-modal interaction and real-time disturbance compensation.
 
 ---
 
-## Problem Statement
+## Problem Statement & Motivation
 
-Conventional robotic surgical platforms are prohibitively expensive, placing them out of reach for most hospitals and research institutions. Beyond cost, they suffer from:
-*   **Centralised Control Bottlenecks:** Standard platforms rely on centralised control architectures where a single processor handles all joint computations, creating communication bottlenecks and single points of failure.
-*   **Backlash Issues:** Backlash in standard gear trains introduces positional uncertainty at the end effector — an unacceptable condition in surgical manipulation.
-*   **Command Latency:** Latency in the control loop, even in the order of milliseconds, can compromise the safety of a remotely operated procedure.
-
-### The Solution
-
-While the present work is a prototype, the platform is architected around low-cost off-the-shelf components and 3D-printed mechanical parts. A production-grade version built for actual surgical deployment would remain significantly more affordable than existing commercial alternatives. 
-
-The reliance on widely available standard components also ensures easy maintenance and repairability — failed parts can be sourced and replaced without proprietary supply chains or specialised tooling.
-
-This project addresses these constraints by:
-1.  **Distributing control intelligence** across the joints.
-2.  Employing **cycloidal gearboxes** that deliver near-zero backlash and high shock tolerance.
-3.  Utilising a **wireless communication layer** that eliminates the wiring complexity typical of multi-axis robotic systems while maintaining sub-millisecond command latency.
+* **Prohibitive Cost & Proprietary Barriers:** Closed commercial systems require high capital investment and proprietary supply chains, limiting accessibility for prototyping and research.
+* **Centralized Compute Bottlenecks:** Single-processor architectures manage all kinematic and low-level loop computations simultaneously, introducing processing bottlenecks and single points of failure.
+* **Joint Backlash:** Conventional low-cost gear trains introduce backlash and mechanical play, causing positional uncertainty at the end effector.
+* **Harness Clutter & Latency:** Multi-joint wiring harnesses add mechanical fatigue, while standard networked wireless solutions introduce latency spikes.
 
 ---
 
-## System Architecture & Design
+## Complete System Architecture
 
-### Drivetrain & Actuation
-*   **Two-Stage Speed Reduction:**
-    *   **First Stage:** GT2 timing belt system running a 2:1 ratio (20-tooth driver pulley, 40-tooth driven pulley, 6mm-wide closed-loop belt).
-    *   **Second Stage:** Custom 3D-printed cycloidal gearbox with an 11:1 ratio, designed for FDM fabrication constraints.
-    *   **Combined Reduction:** 22:1 per joint.
-*   **Joint Motors & Drivers:**
-    *   **Shoulder Joint:** Carries the heaviest cantilevered load and is driven by a NEMA 23 stepper motor with a TB6600 high-current driver.
-    *   **Base & Elbow Joints:** Driven by NEMA 17 stepper motors paired with TMC2209 silent drivers configured for micro-stepping.
-*   **Structural Links:** 2020 aluminium extrusion profiles and standard off-the-shelf components (bearings, fasteners, timing belts) to maximise reliability and reduce fabrication overhead.
-
-### Electronics & Control Architecture
-The electronic architecture follows a distributed node topology:
-*   **Master Node (ESP32-S3):** Runs the inverse kinematics solver, S-curve trajectory generation, and system state machine.
-*   **Actuator Nodes (ESP32-C6 Super Mini):** Three boards serving as joint-level actuator nodes. Each node reads an AS5600 magnetic encoder over I2C and executes an **Active Disturbance Rejection Control (ADRC)** loop locally. 
-    *   *ADRC* estimates and compensates for friction, payload variation, and vibration in real time without requiring an accurate dynamic model.
-*   **Inter-Node Communication:** Uses **ESP-NOW** in a star topology, delivering sub-millisecond latency without a Wi-Fi router.
-
-### Input Modalities
-1.  **Teleoperation:** Provided through an unactuated replica arm fitted with its own AS5600 encoders and ESP32 node, mirroring the surgeon's hand movements in real time.
-2.  **Computer Vision:** An overhead camera feeds an OpenCV pipeline for object detection and spatial localisation.
-3.  **Voice Control:** Voice commands are parsed through cloud-based natural language processing as a hands-free tertiary channel.
-
----
-
-## Expected Outcomes
-
-The expected outcome is a fully functional collaborative surgical robotic arm capable of precise, low-latency remote operation through master-slave teleoperation. The system is expected to demonstrate:
-*   Smooth, backlash-free joint motion under varying loads.
-*   Seamless wireless coordination between distributed joint controllers.
-*   Reliable multi-modal input switching between teleoperation, vision-assisted, and voice-commanded modes.
+```
+[ Input Modalities ]              [ Master Coordination ]                [ Distributed Actuation Nodes ]
+--------------------              -----------------------                -------------------------------
+(1) Teleoperation
+    Master Replica Arm  -------->
+    + AS5600 Encoders
+                                  +-----------------------+   ESP-NOW    +-------------------------------+
+(2) Vision / Object Det.          | ESP32-S3 Master Node  |  (Star Topo) | Node 1: Base Joint            |
+    Camera -> OpenCV   ---------> | - IK Solver           | -----------> | - ESP32-C6 | ADRC Loop | AS5600|
+                                  | - S-Curve Trajectory  |   (< 1 ms)   | - NEMA 17 + TMC2209 Driver    |
+(3) Voice Commands                | - State Machine       |              +-------------------------------+
+    Cloud NLP          ---------> +-----------+-----------+
+                                              |               ESP-NOW    +-------------------------------+
+                                              +------------------------> | Node 2: Shoulder Joint        |
+                                              |               (< 1 ms)   | - ESP32-C6 | ADRC Loop | AS5600|
+                                              |                          | - NEMA 23 + TB6600 Driver     |
+                                              |                          +-------------------------------+
+                                              |
+                                              |               ESP-NOW    +-------------------------------+
+                                              +------------------------> | Node 3: Elbow Joint           |
+                                                              (< 1 ms)   | - ESP32-C6 | ADRC Loop | AS5600|
+                                                                         | - NEMA 17 + TMC2209 Driver    |
+                                                                         +-------------------------------+
+```
 
 ---
 
-## Future Scope
+## Subsystem Specifications
 
-The current vision pipeline is limited to object detection and basic spatial localisation. A natural extension is the integration of real-time AI models for advanced surgical assistance, including:
-*   Instrument tracking
-*   Tissue boundary detection
-*   Procedural guidance overlays
+### 1. Mechanical Arm & Drivetrain
 
-Such a system would function as an intelligent co-pilot to the chief surgeon during live procedures. This capability is identified as a high-impact addition but is kept outside the present scope to maintain focus on the core mechanical, electronic, and control objectives of the platform.
+The mechanical structure combines **2020 aluminum extrusion profiles** with 3D-printed brackets and compliant elements. Each joint features an identical **22:1 compound reduction**:
+
+* **Stage 1 (Belt Drive):** GT2 timing belt running a **2:1 ratio** (20T driver to 40T driven pulley, 6 mm belt width).
+* **Stage 2 (Cycloidal Gearbox):** Custom 3D-printed cycloidal speed reducer delivering an **11:1 ratio** for near-zero backlash and high shock resistance.
+* **End Effector:** Compliant **Fin-Ray mechanical gripper** for adaptive grasping of diverse workpiece geometries.
+
+| Joint Node | Physical Joint | Actuator | Motor Driver | Drivetrain Reduction |
+| :--- | :--- | :--- | :--- | :--- |
+| **Node 1** | **Base** | NEMA 17 Stepper | TMC2209 (Silent / Micro-stepping) | GT2 (2:1) → Cycloidal (11:1) = **22:1** |
+| **Node 2** | **Shoulder** | NEMA 23 Stepper | TB6600 (High-current) | GT2 (2:1) → Cycloidal (11:1) = **22:1** |
+| **Node 3** | **Elbow** | NEMA 17 Stepper | TMC2209 (Silent / Micro-stepping) | GT2 (2:1) → Cycloidal (11:1) = **22:1** |
+
+---
+
+### 2. Distributed Control & Electronics Architecture
+
+* **Master Node (ESP32-S3):** Acts as the central supervisor executing inverse kinematics (IK), S-curve trajectory profiling, and unified state machine management.
+* **Actuator Nodes (3× ESP32-C6 Super Mini):**
+  * **Feedback:** AS5600 12-bit magnetic absolute encoders read real-time joint angles over I2C.
+  * **Control Law:** Onboard **Active Disturbance Rejection Control (ADRC)** loop running locally on each ESP32-C6 to actively estimate and cancel nonlinear friction, load disturbances, and dynamic model uncertainties.
+* **Wireless Interconnect:** Point-to-point **ESP-NOW star topology** facilitating router-free wireless communication with **< 1 ms latency** directly between the master and joint nodes.
+
+---
+
+### 3. Multi-Modal Input Modalities
+
+* **Teleoperation (Leader-Follower):** Passive unactuated master replica arm fitted with AS5600 magnetic absolute encoders for kinesthetic teaching and direct joint mirroring.
+* **Vision / Object Detection:** Overhead camera feeding an **OpenCV pipeline** for coordinate tracking, target identification, and automated spatial localization.
+* **Voice Commands:** Hands-free tertiary input processed via a **Cloud NLP** pipeline for state transitions, predefined routine triggers, and emergency stop overrides.
+
+---
+
+## Expected Outcomes & Evolution Path
+
+**Baseline Verification**
+* Backlash-free multi-axis synchronized tracking across variable payload profiles.
+* Deterministic, sub-millisecond wireless data interchange across all distributed actuator nodes.
+* Robust disturbance rejection and vibration suppression via localized ADRC loops.
+
+**Future Enhancements**
+* Migration to field-oriented control (FOC) brushless DC (BLDC) actuators for dynamic backdrivability.
+* Direct torque sensing for ISO-compliant collaborative power and force limiting (PFL).
+* Real-time spatial edge-AI vision overlays for automated obstacle detection and dynamic path replanning.

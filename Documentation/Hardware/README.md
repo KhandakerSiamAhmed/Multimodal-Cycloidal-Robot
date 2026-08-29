@@ -8,9 +8,9 @@ This directory contains technical documentation, pinouts, wiring diagrams, confi
 
 | Component | Description | Documentation File |
 | :--- | :--- | :--- |
-| **ESP32-C6 Super Mini** | RISC-V 160MHz MCU, Wi-Fi 6, BLE 5, Thread/Zigbee, Native USB-C | [esp32c6_super_mini.md](file:///c:/Users/siama/OneDrive/Desktop/Capstone/Digital%20Twin/documentation/esp32c6_super_mini.md) |
-| **AS5600 Magnetic Encoder** | 12-bit Contactless Rotary Position Sensor (I2C, 4096 counts/rev, 0.087° resolution) | [as5600_encoder.md](file:///c:/Users/siama/OneDrive/Desktop/Capstone/Digital%20Twin/documentation/as5600_encoder.md) |
-| **TMC2209 Stepper Driver** | Ultra-silent Stepper Motor Driver (StealthChop2, SpreadCycle, StallGuard4, MicroPlyer) | [tmc2209_stepper_driver.md](file:///c:/Users/siama/OneDrive/Desktop/Capstone/Digital%20Twin/documentation/tmc2209_stepper_driver.md) |
+| **ESP32-C6 Super Mini** | RISC-V 160MHz MCU, Wi-Fi 6, BLE 5, Thread/Zigbee, Native USB-C | [esp32c6_super_mini.md](esp32c6_super_mini.md) |
+| **AS5600 Magnetic Encoder** | 12-bit Contactless Rotary Position Sensor (I2C, 4096 counts/rev, 0.087° resolution) | [as5600_encoder.md](as5600_encoder.md) |
+| **TMC2209 Stepper Driver** | Ultra-silent Stepper Motor Driver (StealthChop2, SpreadCycle, StallGuard4, MicroPlyer) | [tmc2209_stepper_driver.md](tmc2209_stepper_driver.md) |
 
 ---
 
